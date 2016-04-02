@@ -53,7 +53,7 @@ module Car
 //            @display("p=410,398");
 //        }
 
-		hostAutoConfigurator: HostAutoConfigurator {
+        hostAutoConfigurator: HostAutoConfigurator {
             parameters:
                 @display("p=422,403");
                 interfaces = "nic";
@@ -69,7 +69,7 @@ module Car
             @display("p=72,232");
         }
 
-        
+
 
         routingTable: RoutingTable {
             @display("p=422,254");
@@ -79,7 +79,7 @@ module Car
 
 
         aodvRouting: AODVRouting {
-            @display("p=262,231;b=49,43");
+            @display("p=216,231;b=49,43");
         }
 
         interfaceTable: InterfaceTable {
@@ -103,11 +103,11 @@ module Car
 
         udpBasicApp: UDPBasicApp {
             parameters:
-            	@display("p=76,33");
-            	destAddresses = "10.0.0.45";
-            	destPort = 5555;
-            	messageLength = 100B;
-            	sendInterval = 1s;
+                @display("p=76,33");
+                destAddresses = "10.0.0.45";
+                destPort = 5555;
+                messageLength = 100B;
+                sendInterval = 1s;
         }
         udp: UDP {
             @display("p=72,120");
