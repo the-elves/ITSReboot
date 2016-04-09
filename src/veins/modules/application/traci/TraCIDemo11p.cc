@@ -23,6 +23,9 @@
 using Veins::TraCIMobilityAccess;
 using Veins::AnnotationManagerAccess;
 #include <iostream>
+#include <ARP.h>
+#include "Ieee802Ctrl_m.h"
+#include "ARPPacket_m.h"
 
 const simsignalwrap_t TraCIDemo11p::parkingStateChangedSignal = simsignalwrap_t(TRACI_SIGNAL_PARKING_CHANGE_NAME);
 
@@ -53,27 +56,64 @@ void TraCIDemo11p::onData(WaveShortMessage* wsm) {
 //	annotations->scheduleErase(1, annotations->drawLine(wsm->getSenderPos(), mobility->getPositionAt(simTime()), "blue"));
 //	if (mobility->getRoadId()[0] != ':') traciVehicle->changeRoute(wsm->getWsmData(), 9999);
 //	if (!sentMessage) sendMessage(wsm->getWsmData());
+//-------------------------------------------------------
+    ////    memcpy(upperDatagram, copy->getWsmData(), (copy->getBitLength()-88)/8);
+    //    IPv4Datagram *datagram = new IPv4Datagram( copy->getWsmData ());
+
     if(wsm == NULL)
             error("wsm error");
-    WaveShortMessage *copy = wsm->dup();
-    IPv4Datagram *upperDatagram = dynamic_cast<IPv4Datagram*>(copy->getObject("mymsg"));
-//    memcpy(upperDatagram, copy->getWsmData(), (copy->getBitLength()-88)/8);
-    std::cout<<"@@@ "<<upperDatagram->getDestAddress().str()<<endl;
-//    IPv4Datagram *datagram = new IPv4Datagram( copy->getWsmData ());
-    send(upperDatagram->dup(),upperLayerOut);
+    cPacket *incomingMessage= check_and_cast<cPacket*>(wsm->getObject("mymsg"));
+    IPv4Datagram *upperDatagram = dynamic_cast<IPv4Datagram*>(incomingMessage);
+    if (upperDatagram == NULL){
+        ARPPacket *upperARPPacket;
+        upperARPPacket = dynamic_cast<ARPPacket*>(wsm->getObject("mymsg"))->dup();
+        upperARPPacket->removeControlInfo();
+        assert(upperARPPacket);
+        cMsgPar *par = dynamic_cast<cMsgPar*> (wsm->getParList().get("ctrlinfo") );
+        assert(par);
+        assert(par->getObjectValue());
+        Ieee802Ctrl *ctrlinfo =  (Ieee802Ctrl *)(par->getObjectValue());
+        assert(ctrlinfo);
+        // ctrlinfo = dynamic_cast<Ieee802Ctrl*>(attachedObjects->get(0));
+        upperARPPacket->setControlInfo(ctrlinfo->dup());
+        send(upperARPPacket,upperLayerOut);
+        return;
+    }
+    assert(upperDatagram);
+    send(incomingMessage->dup(),upperLayerOut);
 
 }
 
 void TraCIDemo11p::handleUpperMsg(cMessage *msg){
     EV<<"Forwarding message to lower layer";
     t_channel channel = dataOnSch ? type_SCH : type_CCH;
-    IPv4Datagram *upperDatagram = dynamic_cast<IPv4Datagram*>(msg);
-    WaveShortMessage* wsm = prepareWSM("data", upperDatagram->getBitLength(), channel, dataPriority, -1,2);
-    msg->setName("mymsg");
-    wsm->addObject(msg);
+    cPacket *upperDatagram = dynamic_cast<IPv4Datagram*>(msg);
+    WaveShortMessage* wsm;
+    Ieee802Ctrl *ctrolinfo;
+    ctrolinfo = NULL;
+    if(upperDatagram == NULL){
+        ARPPacket *upperARP;
+        upperARP = dynamic_cast<ARPPacket*>(msg);
+        assert(upperARP);
+        ctrolinfo = (dynamic_cast<Ieee802Ctrl *>(upperARP->getControlInfo()) )->dup();
+        assert(ctrolinfo);
+        msg->setName("mymsg");
+        wsm = prepareWSM("data", upperARP->getBitLength(), channel, dataPriority, -1,2);
+        cMsgPar *par = new cMsgPar("ctrlinfo");
+        par->setObjectValue((cOwnedObject*)ctrolinfo);
+        wsm->addPar(par);
+        wsm->addObject(msg);
+    }
+    else{
+        msg->setName("mymsg");
+        wsm = prepareWSM("data", upperDatagram->getBitLength(), channel, dataPriority, -1,2);
+        wsm->addObject(msg);
+    }
+
     sendWSM(wsm->dup());
+
 //    std::cout<<"ppp "<<((IPv4Datagram*)wsm->getWsmData())->getDestAddress().str()<<endl;
-    std::cout<<"ppp "<<((IPv4Datagram*)upperDatagram)->getDestAddress().str()<<endl;
+//    std::cout<<"ppp "<<((IPv4Datagram*)upperDatagram)->getDestAddress().str()<<endl;
 
 }
 
